@@ -1,3 +1,4 @@
-./yolov8n.pt
-./runs
-./.venv
+yolov8n.pt
+runs
+.venv/
+.idea/

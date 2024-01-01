@@ -13,7 +13,7 @@ mode: str = "webcam"
 
 save_results: bool = True
 
-frame_width: int = 640
+frame_width: int = 640 
 frame_height: int = 480
 
 capture: cv2.VideoCapture | None = None
@@ -25,7 +25,11 @@ if mode == "webcam":
 else:
     capture = cv2.VideoCapture("*path_to_video*")
 
-if save_results:    
+if save_results:
+    try:
+        os.remove('./saved_results.avi')
+    except OSError:
+        pass  
     saved_results = cv2.VideoWriter('./saved_results.avi', cv2.VideoWriter_fourcc(*'MJPG'), 
                         30, (frame_width, frame_height))
 

@@ -57,9 +57,12 @@ while True:
                     color: tuple[int, int, int] = (0, 0, 255)
 
                 cvzone.cornerRect(image, (x1, y1, w, h), colorC = color, colorR = color)
-                cvzone.putTextRect(image, f"{class_names[current_class].upper()} {round(current_confidence.item(), 2) * 100}%",
-                                   (max(0, x1), max(35, y1)), scale = 2, thickness = 4,
-                                   colorR = color, colorB = color)
+                cvzone.putTextRect(image, f"{class_names[current_class].upper()}" +
+                    f"{round(current_confidence.item(), 2) * 100}%",
+                    (max(0, x1), max(35, y1)), scale = 2, thickness = 4,
+                    colorR = color, colorB = color)
 
     cv2.imshow("Image", image)
     cv2.waitKey(1)
+
+capture.release()

@@ -1,75 +1,81 @@
-import cvzone
-from cvzone.FaceDetectionModule import FaceDetector
-import cv2
 import math
+import os
 from pathlib import Path
-
 from time import time
 
+import cvzone
+import cv2
+import numpy as np
+from cvzone.FaceDetectionModule import FaceDetector
 
-import os
 
-file_path = Path(os.path.basename(__file__))
-print(file_path)
-dir_path = Path(os.path.dirname(os.path.realpath(__file__)))
-print(dir_path)
+debug: bool = False
+save: bool = False
 
-result = Path.joinpath(dir_path, file_path)
-print(result)
+dir_path: os.PathLike = Path(os.path.dirname(os.path.realpath(__file__)))
+if debug:
+    print(dir_path)
 
-outputFolderPath = Path.joinpath(result.parents[0], "Datasets/DataCollected")
-print(outputFolderPath)
+output_folder_path: os.PathLike = Path.joinpath(Path.joinpath(dir_path, "Datasets"), "DataCollected")
+if debug:
+    print(output_folder_path)
 
-classID = 1  # 0 means fake and 1 means real
+class_id: int = 0  # 0 means fake and 1 means real
 
-debug = False
-save = True
+offset_percentage_w: int = 10
+offset_percentage_h: int = 20
 
-offsetPercentageW = 10
-offsetPercentageH = 20
+confidence_threshold: float = 0.8
 
-confidence = 0.8
+camera_width: int = 640
+camera_height: int = 480
 
-camWidth, camHeight = 640, 480
+precision: int = 6
 
-floatingPoints = 6
+blur_threshold: int = 70  # larger means more focus
 
-blurThreshold = 60  # larger means more focus
+capture: cv2.VideoCapture = cv2.VideoCapture(0)
+capture.set(3, camera_width)
+capture.set(4, camera_height)
 
-cap = cv2.VideoCapture(0)
-cap.set(3, camWidth)
-cap.set(4, camHeight)
+detector: FaceDetector = FaceDetector()
 
-detector = FaceDetector()
 while True:
-    success, img = cap.read()
-    imgOut = img.copy()
-    img, bboxs = detector.findFaces(img, draw=False)
+    success: bool = False
+    image: np.ndarray = np.empty(0)
+    success, image = capture.read()
 
-    listBlur = []  # true if face is blur else false
-    listInfo = []  # normalized values and a class name for the label text file
+    image_out: np.ndarray = image.copy()
 
-    if bboxs:
+    bboxes: list[dict[str]] = []
+    image, bboxes = detector.findFaces(image, draw=False)
+
+    list_blur: list[bool] = []  # true if face is blur else false
+    list_info: list[str] = []  # normalized values and a class name for the label text file
+
+    if bboxes:
         # bboxInfo - "id","bbox","score","center"
-        # center = bboxs[0]["center"]
-        # cv2.circle(img, center, 5, (255, 0, 255), cv2.FILLED)
-        for bbox in bboxs:
+        for bbox in bboxes:
+            x: int = 0
+            y: int = 0
+            w: int = 0
+            h: int = 0
             x, y, w, h = bbox["bbox"]
-            score = bbox["score"][0]
 
-            # ----check the score----
-            if score > confidence:
+            current_confidence: float = bbox["score"][0]
 
+            # ----check the current confidence----
+            if current_confidence > confidence_threshold:
                 # ----adding offset to the detected face----
-                offsetW = (offsetPercentageW/100)*w
+                offset_w: float = (offset_percentage_w/100)*w
 
-                x = x - math.ceil(offsetW)
-                w = w + math.ceil(offsetW*2)
+                x -= math.ceil(offset_w)
+                w += math.ceil(offset_w*2)
 
-                offsetH = (offsetPercentageH/100)*h
+                offset_h: float = (offset_percentage_h/100)*h
 
-                y = y - math.ceil(offsetH*3)
-                h = h + math.ceil(offsetH*3.5)
+                y -= math.ceil(offset_h*3)
+                h += math.ceil(offset_h*3.5)
 
                 # ----to avoid values below 0----
                 x = max(x, 0)
@@ -78,62 +84,63 @@ while True:
                 h = max(h, 0)
 
                 # ----find blurriness----
+                face_crop: np.ndarray = image[y:y + h, x: x + w]
 
-                imageFace = img[y:y + h, x: x + w]
-                # cv2.imshow("face", imageFace)
-                blurValue = math.ceil(cv2.Laplacian(imageFace, cv2.CV_64F).var())
-                if blurValue > blurThreshold:
-                    listBlur.append(True)
+                blur_value: int = math.ceil(cv2.Laplacian(face_crop, cv2.CV_64F).var())
+                if blur_value > blur_threshold:
+                    list_blur.append(True)
                 else:
-                    listBlur.append(False)
+                    list_blur.append(False)
 
                 # ----normalize values----
+                image_height: int = 0
+                image_width: int = 0
+                image_height, image_width, _ = image.shape
 
-                print(img.shape)
-                imageHeight, imageWidth, _ = img.shape
+                x_center: float = x + w/2
+                y_center: float =  y + h/2
 
-                xNormalized = x / imageWidth
-                xCenter, yCenter = x + w / 2, y + h/2
+                x_center_normalized: float = round(x_center/image_width, precision)
+                y_center_normalized: float = round(y_center/image_height, precision)
 
-                xCenterNormalized = round(xCenter/imageWidth, floatingPoints)
-                yCenterNormalized = round(yCenter/imageHeight, floatingPoints)
-
-                wNormalized = round(w/imageWidth, floatingPoints)
-                hNormalized = round(h/imageHeight, floatingPoints)
+                w_normalized: float = round(w/image_width, precision)
+                h_normalized: float = round(h/image_height, precision)
 
                 # ----to avoid values above 1----
-                xCenterNormalized = min(xCenterNormalized, 1)
-                yCenterNormalized = min(yCenterNormalized, 1)
-                wNormalized = min(wNormalized, 1)
-                hNormalized = min(hNormalized, 1)
+                x_center_normalized = min(x_center_normalized, 1)
+                y_center_normalized = min(y_center_normalized, 1)
+                w_normalized = min(w_normalized, 1)
+                h_normalized = min(h_normalized, 1)
 
                 # YOLO requires this format
-                listInfo.append(f"{classID} {xCenterNormalized} {yCenterNormalized} {wNormalized} {hNormalized}\n")
+                list_info.append(f"{class_id} {x_center_normalized}" +
+                    f"{y_center_normalized} {w_normalized} {h_normalized}\n")
 
                 # ----drawing----
-
-                cv2.rectangle(imgOut, (x, y, w, h), (255, 0, 0), 3)
-                cvzone.putTextRect(imgOut, f"Score: {math.floor(score*100)}%; Blur: {blurValue}", (x, y-20),
-                                   scale=1.5, thickness=3)
-
+                cv2.rectangle(image_out, (x, y, w, h), (255, 0, 0), 3)
+                cvzone.putTextRect(image_out, f"Score: {math.floor(current_confidence*100)}%;" +
+                    f"Blur: {blur_value}", (x, y-20), scale = 1.5, thickness = 3)
+    
                 if debug:
-                    cv2.rectangle(img, (x, y, w, h), (255, 0, 0), 3)
-                    cvzone.putTextRect(img, f"Score: {math.floor(score * 100)}%; Blur: {blurValue}", (x, y - 20),
-                                       scale=1.5, thickness=3)
+                    cv2.rectangle(image, (x, y, w, h), (255, 0, 0), 3)
+                    cvzone.putTextRect(image, f"Score: {math.floor(current_confidence * 100)}%;" +
+                        f"Blur: {blur_value}", (x, y - 20), scale = 1.5, thickness = 3)
 
         # ---- to save ----
         if save:
-            if all(listBlur) and listBlur != []:  # all the faces aren't blurred
-                # ---- save image ====
-                timeNow = "".join(str(time()).split("."))
-                # print(timeNow)
-                print(f"{outputFolderPath}/{timeNow}.jpg")
-                cv2.imwrite(f"{outputFolderPath}/{timeNow}.jpg", img)
+            if list_blur != [] and all(list_blur):  # all the faces aren't blurred
+                # ---- save image ----
+                time_now = "".join(str(time()).split("."))
+
+                if debug:
+                    print(Path.joinpathPath(output_folder_path, f"{time_now}.jpg"))
+                
+                cv2.imwrite(Path.joinpathPath(output_folder_path, f"{time_now}.jpg"), image)
 
                 # ----save label text file----
-                with open(f"{outputFolderPath}/{timeNow}.txt", "a") as f:
-                    for info in listInfo:
-                        f.write(info)
+                with open(Path.joinpathPath(output_folder_path, f"{time_now}.jpg"), "a") as output:
+                    for info in list_info:
+                        output.write(info)
 
-    cv2.imshow("Image", imgOut)
+    cv2.imshow("Image", image_out)
     cv2.waitKey(1)

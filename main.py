@@ -19,12 +19,9 @@ if mode == "webcam":
 else:
     capture = cv2.VideoCapture("*path_to_video*")
 
-file_path: os.PathLike = Path(os.path.basename(__file__))
 dir_path: os.PathLike = Path(os.path.dirname(os.path.realpath(__file__)))
-file_path = Path.joinpath(dir_path, file_path)
 
-path_to_weights: os.PathLike = Path.joinpath(Path.joinpath(file_path.parents[0], "saved_weights"), 
-    "best.pt")
+path_to_weights: os.PathLike = Path.joinpath(Path.joinpath(dir_path, "saved_weights"), "best.pt")
 
 model: YOLO = YOLO(path_to_weights)
 
@@ -64,5 +61,5 @@ while True:
                                    (max(0, x1), max(35, y1)), scale = 2, thickness = 4,
                                    colorR = color, colorB = color)
 
-    cv2.imshow("Image", img)
+    cv2.imshow("Image", image)
     cv2.waitKey(1)

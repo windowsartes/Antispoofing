@@ -2,80 +2,74 @@ import math
 import os
 import random
 import shutil
-from itertools import islice
-
 from pathlib import Path
 
-splitRatio = {"train": 0.7, "val": 0.2, "test": 0.1}
-classes = ["fake", "real"]
 
-file_path = Path(os.path.basename(__file__))
-dir_path = Path(os.path.dirname(os.path.realpath(__file__)))
+split_ratio: dict[str, float] = {"train": 0.7, "val": 0.2, "test": 0.1}
+classes: list[str] = ["fake", "real"]
 
-result = Path.joinpath(dir_path, file_path)
+dir_path: os.PathLike = Path(os.path.dirname(os.path.realpath(__file__)))
 
-outputFolderPath = Path.joinpath(result.parents[0], "Datasets/SplitData")
-inputFolderPath = Path.joinpath(result.parents[0], "Datasets/all")
+output_folder_path = Path.joinpath(Path.joinpath(dir_path, "Datasets"), "SplitData")
+input_folder_path = Path.joinpath(Path.joinpath(dir_path, "Datasets"), "all")
 
-trainingMode = "offline"
+training_mode: str = "offline"
 
 try:
-    shutil.rmtree(outputFolderPath)
-    print("Removed")
+    shutil.rmtree(output_folder_path)
 except OSError as error:
-    os.mkdir(outputFolderPath)
+    os.mkdir(output_folder_path)
 
+# ----creating directories----
+os.makedirs(Path.joinpath(Path.joinpath(output_folder_path, "train"), "images"), exist_ok=True)
+os.makedirs(Path.joinpath(Path.joinpath(output_folder_path, "train"), "labels"), exist_ok=True)
+os.makedirs(Path.joinpath(Path.joinpath(output_folder_path, "val"), "images"), exist_ok=True)
+os.makedirs(Path.joinpath(Path.joinpath(output_folder_path, "val"), "labels"), exist_ok=True)
+os.makedirs(Path.joinpath(Path.joinpath(output_folder_path, "test"), "images"), exist_ok=True)
+os.makedirs(Path.joinpath(Path.joinpath(output_folder_path, "test"), "labels"), exist_ok=True)
 
-# ----creating directories-----
-os.makedirs(f"{outputFolderPath}/train/images", exist_ok=True)
-os.makedirs(f"{outputFolderPath}/train/labels", exist_ok=True)
-os.makedirs(f"{outputFolderPath}/val/images", exist_ok=True)
-os.makedirs(f"{outputFolderPath}/val/labels", exist_ok=True)
-os.makedirs(f"{outputFolderPath}/test/images", exist_ok=True)
-os.makedirs(f"{outputFolderPath}/test/labels", exist_ok=True)
-
-
-# print(inputFolderPath)
 # ----getting the names----
-listNames = os.listdir(inputFolderPath)
-uniqueNames = []
-for name in listNames:
-    uniqueNames.append(name.split(".")[0])
-uniqueNames = list(set(uniqueNames))
+list_names: list[str] = os.listdir(input_folder_path)
+unique_names: list[str] = []
 
-# print(uniqueNames)
+for name in list_names:
+    unique_names.append(name.split(".")[0])
 
-# ----shuffle----
+unique_names = list(set(unique_names))
 
-random.shuffle(uniqueNames)
+random.shuffle(unique_names)
 
-lenData = len(uniqueNames)
-lenTrain = math.ceil(lenData*splitRatio["train"])
-lenVal = math.ceil(lenData*splitRatio["val"])
-lenTest = lenData - lenTrain - lenVal
+len_data: int = len(unique_names)
+len_train: int = math.ceil(len_data*split_ratio["train"])
+len_val: int = math.ceil(len_data*split_ratio["val"])
+len_test: int = len_data - len_train - len_val
 
-dataType2UniqueNames = dict()
-dataType2UniqueNames["train"] = uniqueNames[:lenTrain]
-dataType2UniqueNames["val"] = uniqueNames[lenTrain: lenTrain + lenVal]
-dataType2UniqueNames["test"] = uniqueNames[lenTrain + lenVal:]
+data_type2unique_names: dict[str, list[str]] = dict()
+data_type2unique_names["train"] = unique_names[:len_train]
+data_type2unique_names["val"] = unique_names[len_train: len_train + len_val]
+data_type2unique_names["test"] = unique_names[len_train + len_val:]
 
-dataTypes = ["train", "val", "test"]
-for dataType in dataTypes:
-    for filename in dataType2UniqueNames[dataType]:
-        shutil.copy(f"{inputFolderPath}/{filename}.jpg", f"{outputFolderPath}/{dataType}/images/{filename}.jpg")
-        shutil.copy(f"{inputFolderPath}/{filename}.txt", f"{outputFolderPath}/{dataType}/labels/{filename}.txt")
+data_types: list[str] = ["train", "val", "test"]
+for data_type in data_types:
+    for filename in data_type2unique_names[data_type]:
+        shutil.copy(Path.joinpath(input_folder_path, f"{filename}.jpg"),
+            Path.joinpath(Path.joinpath(Path.joinpath(output_folder_path,
+                data_type), "images"), f"{filename}.jpg"))
+
+        shutil.copy(Path.joinpath(input_folder_path, f"{filename}.txt"),
+            Path.joinpath(Path.joinpath(Path.joinpath(output_folder_path,
+                data_type), "labels"), f"{filename}.txt"))
 
 # ----creating dataYaml file----
-
-if trainingMode == "online":
-    dataYaml = f"path: ../Data\ntrain: ../train/images\n\
+if training_mode == "online":
+    data_yaml: str = f"path: ../Data\ntrain: ../train/images\n\
 val: ../val/images\n\
 test: ../test/images\n\
 \n\
 nc: {len(classes)}\n\
 names: {classes}\n"
-elif trainingMode == "offline":
-    dataYaml = f"path: {outputFolderPath}\n\
+elif training_mode == "offline":
+    data_yaml: str = f"path: {output_folder_path}\n\
 train: train/images\n\
 val: val/images\n\
 test: test/images\n\
@@ -83,5 +77,5 @@ test: test/images\n\
 nc: {len(classes)}\n\
 names: {classes}\n"
 
-with open(f"{outputFolderPath}/data.yaml", "w") as f:
-    f.write(dataYaml)
+with open(Path.joinpath(output_folder_path, "data.yaml"), "w") as output:
+    output.write(data_yaml)

@@ -2,86 +2,104 @@ import math
 import os
 from pathlib import Path
 
+import click
 import cv2
 import cvzone
 from ultralytics import YOLO
 
 
-confidence_threshold: float = 0.8
+@click.command()
+@click.option("--mode", default="webcam", show_default=True, type=click.Choice(["webcam", "video"]),
+    show_choices=True, help="Usage mode can be either 'webcam' or 'video'")
+@click.option("--path_to_video", default="", show_default=True, type=str,
+    help="Path to video you want to use; will be used only if mode='video'")
+@click.option("--save", default=False, type=bool, show_default=True,
+    show_choices=True, help="True if you want to save result as .avi video")
+def main(mode: str, path_to_video: str, save: bool):
+    dir_path: os.PathLike = Path(os.path.dirname(os.path.realpath(__file__)))
 
-mode: str = "webcam"
+    confidence_threshold: float = 0.8
 
-save_results: bool = True
+    frame_width: int = 640  
+    frame_height: int = 480
 
-frame_width: int = 640
-frame_height: int = 480
+    capture: cv2.VideoCapture | None = None
 
-capture: cv2.VideoCapture | None = None
+    if mode == "webcam":
+        capture = cv2.VideoCapture(0)
+        capture.set(3, frame_width)
+        capture.set(4, frame_height)
+    elif mode == "video":
+        if os.path.exists(path_to_video):
+            capture = cv2.VideoCapture(path_to_video)
+        else:
+            raise ValueError
 
-if mode == "webcam":
-    capture = cv2.VideoCapture(0)
-    capture.set(3, frame_width)
-    capture.set(4, frame_height)
-else:
-    capture = cv2.VideoCapture("*path_to_video*")
+    if save:
+        try:
+            os.remove(Path.joinpath(dir_path, "saved_results.avi"))
+        except OSError:
+            pass  
+        saved_results = cv2.VideoWriter(Path.joinpath(dir_path, "saved_results.avi"), cv2.VideoWriter_fourcc(*'MJPG'), 
+                            30, (frame_width, frame_height))
 
-if save_results:    
-    saved_results = cv2.VideoWriter('./saved_results.avi', cv2.VideoWriter_fourcc(*'MJPG'), 
-                        30, (frame_width, frame_height))
+    path_to_weights: os.PathLike = Path.joinpath(Path.joinpath(dir_path, "saved_weights"), "best.pt")
 
-dir_path: os.PathLike = Path(os.path.dirname(os.path.realpath(__file__)))
+    model: YOLO = YOLO(path_to_weights)
 
-path_to_weights: os.PathLike = Path.joinpath(Path.joinpath(dir_path, "saved_weights"), "best.pt")
+    class_names: list[str] = ["fake", "real"]
 
-model: YOLO = YOLO(path_to_weights)
+    while True:
+        success, image = capture.read()
+        results = model(image, stream=True, verbose=False)
 
-class_names: list[str] = ["fake", "real"]
+        for result in results:
+            boxes = result.boxes
 
-while True:
-    success, image = capture.read()
-    results = model(image, stream=True, verbose=False)
+            for box in boxes:
+                x1: int | float = 0
+                y1: int | float = 0
+                x2: int | float = 0
+                y2: int | float = 0
 
-    for result in results:
-        boxes = result.boxes
+                x1, y1, x2, y2 = box.xyxy[0]
+                x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
 
-        for box in boxes:
-            x1: int | float = 0
-            y1: int | float = 0
-            x2: int | float = 0
-            y2: int | float = 0
+                w: int = 0
+                h: int = 0
+                w, h = x2 - x1, y2 - y1
 
-            x1, y1, x2, y2 = box.xyxy[0]
-            x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+                current_confidence: float = box.conf[0]
+                current_class: int = int(box.cls[0])
 
-            w: int = 0
-            h: int = 0
-            w, h = x2 - x1, y2 - y1
+                if current_confidence > confidence_threshold:
+                    if class_names[current_class] == "real":
+                        color: tuple[int, int, int] = (0, 255, 0)
+                    else:
+                        color: tuple[int, int, int] = (0, 0, 255)
 
-            current_confidence: float = box.conf[0]
-            current_class: int = int(box.cls[0])
+                    cvzone.cornerRect(image, (x1, y1, w, h), colorC = color, colorR = color)
+                    cvzone.putTextRect(image, f"{class_names[current_class].upper()} " +
+                        f"{round(current_confidence.item(), 2) * 100}%",
+                        (max(0, x1), max(35, y1)), scale = 2, thickness = 4,
+                        colorR = color, colorB = color)
+        
+        if save:
+            saved_results.write(image)
 
-            if current_confidence > confidence_threshold:
-                if class_names[current_class] == "real":
-                    color: tuple[int, int, int] = (0, 255, 0)
-                else:
-                    color: tuple[int, int, int] = (0, 0, 255)
+        cv2.imshow("Image", image)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
 
-                cvzone.cornerRect(image, (x1, y1, w, h), colorC = color, colorR = color)
-                cvzone.putTextRect(image, f"{class_names[current_class].upper()} " +
-                    f"{round(current_confidence.item(), 2) * 100}%",
-                    (max(0, x1), max(35, y1)), scale = 2, thickness = 4,
-                    colorR = color, colorB = color)
-    
-    if save_results:
-        saved_results.write(image)
+    capture.release()
 
-    cv2.imshow("Image", image)
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+    if save:
+        saved_results.release()
 
-capture.release()
+    cv2.destroyAllWindows() 
 
-if save_results:
-    saved_results.release()
-
-cv2.destroyAllWindows() 
+if __name__ == "__main__":
+    try:
+        main()
+    except ValueError:
+        print("Check the path to your video; it doesn's exist.")

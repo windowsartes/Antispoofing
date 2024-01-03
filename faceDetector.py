@@ -156,5 +156,3 @@ def detect_faces(debug: bool, save: bool):
 
 if __name__ == "__main__":
     detect_faces()
-
-sdfdsfds

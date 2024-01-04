@@ -40,8 +40,8 @@ def main(mode: str, path_to_video: str, save: bool):
             os.remove(Path.joinpath(dir_path, "saved_results.avi"))
         except OSError:
             pass  
-        saved_results = cv2.VideoWriter(Path.joinpath(dir_path, "saved_results.avi"), cv2.VideoWriter_fourcc(*'MJPG'), 
-                            30, (frame_width, frame_height))
+        saved_results = cv2.VideoWriter(str(Path.joinpath(dir_path, "saved_results.avi")),
+            cv2.VideoWriter_fourcc(*'MJPG'), 30, (frame_width, frame_height))
 
     path_to_weights: os.PathLike = Path.joinpath(Path.joinpath(dir_path, "saved_weights"), "best.pt")
 

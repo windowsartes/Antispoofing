@@ -10,7 +10,7 @@ Here my stack includes: YOLO via ultralytics and cli via click.
 
 Here you can find a gif of me with model inference example:
 
-[inference example](./readme_data/saved_results.gif)
+![](./readme_data/saved_results.gif)
 
 # Credits
 

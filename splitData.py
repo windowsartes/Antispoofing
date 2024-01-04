@@ -67,7 +67,7 @@ def split_data(training_mode: str):
                 Path.joinpath(Path.joinpath(Path.joinpath(output_folder_path,
                     data_type), "labels"), f"{filename}.txt"))
 
-    # ----creating dataYaml file----
+    # ----creating data.yaml file----
     if training_mode == "online":
         data_yaml: str = f"path: ../Data\n" + \
             "train: ../train/images\n" + \

@@ -1,4 +1,7 @@
 yolov8n.pt
+
 runs
+Datasets/
+
 .venv/
 .idea/

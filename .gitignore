@@ -5,3 +5,5 @@ Datasets/
 
 .venv/
 .idea/
+
+*.avi
